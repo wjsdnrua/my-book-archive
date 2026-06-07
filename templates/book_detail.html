@@ -8,7 +8,7 @@
     .book-cover-large { width: 220px; min-width: 220px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); object-fit: cover; aspect-ratio: 2 / 3; }
     .book-info-large { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
     
-    /* 💡 KDC 로딩 배지 디자인 */
+    /* KDC 로딩 배지 디자인 */
     .kdc-visual-badge { background-color: rgba(0, 122, 255, 0.1); color: var(--accent); padding: 8px 16px; border-radius: 10px; font-size: 0.9rem; font-weight: 700; margin-bottom: 15px; transition: 0.3s; }
     .kdc-visual-badge.loading { opacity: 0.7; animation: pulse 1.5s infinite; }
     @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
@@ -22,7 +22,7 @@
     
     .review-form { display: flex; flex-direction: column; gap: 20px; }
     
-    /* 💡 탄력 있는 인터랙티브 별점 애니메이션 */
+    /* 탄력 있는 인터랙티브 별점 애니메이션 */
     .rating-wrapper { display: flex; align-items: center; gap: 15px; background: var(--bg-card); padding: 10px 20px; border-radius: 16px; display: inline-flex; border: 1px solid var(--border-color); }
     .rating-wrapper label.rating-title { font-weight: 700; font-size: 1.1rem; color: var(--text-main); margin-right: 10px; }
     .star-rating { direction: rtl; display: inline-flex; }
@@ -93,7 +93,7 @@
     {% for review in reviews %}
         <div class="history-card">
             <div class="history-meta">
-                <span>{{ review.created_at[:16] }} 작성됨</span>
+                <span>{{ (review.created_at | string)[:16] }} 작성됨</span>
                 <span style="color: var(--rating); font-size: 1.2rem; font-weight: bold;">{{ '★' * review.rating }}</span>
             </div>
             <div class="history-text">{{ review.review_text }}</div>
