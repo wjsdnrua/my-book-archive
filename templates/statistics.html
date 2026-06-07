@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}독서 통계 - Book Archive{% endblock %}
+
+{% block extra_css %}
+<style>
+    .header-area { margin-bottom: 40px; }
+    h1 { font-size: 2.5rem; letter-spacing: -1px; margin: 0 0 10px 0; color: var(--text-main); }
+    .subtitle { color: var(--text-sub); font-size: 1.1rem; }
+    
+    .stats-summary { display: flex; gap: 20px; margin-bottom: 30px; }
+    .summary-card { flex: 1; background: var(--bg-card); padding: 25px; border-radius: 20px; border: 1px solid var(--border-color); text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.02); }
+    .summary-value { font-size: 2.5rem; font-weight: 800; color: var(--accent); margin-bottom: 5px; }
+    .summary-label { font-size: 1rem; color: var(--text-sub); font-weight: 600; }
+
+    .charts-container { display: flex; gap: 20px; flex-wrap: wrap; }
+    .chart-box { flex: 1; min-width: 300px; background: var(--bg-card); padding: 30px; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: 0 4px 20px rgba(0,0,0,0.02); }
+    .chart-title { font-size: 1.2rem; font-weight: 700; color: var(--text-main); margin-bottom: 20px; text-align: center; }
+    
+    .empty-state { text-align: center; padding: 60px; background: var(--bg-card); border-radius: 20px; border: 1px dashed var(--border-color); margin-top: 20px; }
+    .empty-state h3 { color: var(--text-main); margin-bottom: 10px; }
+    .empty-state p { color: var(--text-sub); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="header-area">
+    <h1>나의 독서 통계</h1>
+    <div class="subtitle">{{ current_user.nickname }} 작가님의 독서 발자취를 분석합니다.</div>
+</div>
+
+{% if empty %}
+    <div class="empty-state">
+        <h3>아직 분석할 데이터가 없습니다 😢</h3>
+        <p>감상문 보드에 책을 등록하면, 이곳에 멋진 그래프가 나타날 거예요!</p>
+        <br>
+        <a href="/" style="padding: 10px 20px; background: var(--accent); color: white; border-radius: 10px; text-decoration: none; font-weight: bold; display: inline-block; margin-top: 15px;">새로운 책 검색하러 가기</a>
+    </div>
+{% else %}
+    <div class="stats-summary">
+        <div class="summary-card">
+            <div class="summary-value">{{ total_count }}</div>
+            <div class="summary-label">총 읽은 책 (권)</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-value">{{ avg_rating }}</div>
+            <div class="summary-label">평균 별점</div>
+        </div>
+    </div>
+
+    <div class="charts-container">
+        <div class="chart-box" style="flex: 1;">
+            <div class="chart-title">분야별 독서 취향</div>
+            <canvas id="kdcChart"></canvas>
+        </div>
+        <div class="chart-box" style="flex: 2;">
+            <div class="chart-title">월별 독서량 추이</div>
+            <canvas id="monthlyChart"></canvas>
+        </div>
+    </div>
+
+    <script id="kdc-data" type="application/json">{{ kdc_stats | tojson | safe }}</script>
+    <script id="monthly-data" type="application/json">{{ monthly_stats | tojson | safe }}</script>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!document.getElementById('kdc-data')) return;
+
+        const kdcData = JSON.parse(document.getElementById('kdc-data').textContent);
+        const monthlyData = JSON.parse(document.getElementById('monthly-data').textContent);
+
+        Chart.defaults.font.family = "'Pretendard', sans-serif";
+        const textColor = document.body.classList.contains('dark-mode') ? '#FFFFFF' : '#1D1D1F';
+        Chart.defaults.color = textColor;
+
+        const kdcCtx = document.getElementById('kdcChart').getContext('2d');
+        const kdcLabels = Object.keys(kdcData).map(k => k.split('(')[0].trim());
+        const kdcValues = Object.values(kdcData);
+
+        new Chart(kdcCtx, {
+            type: 'doughnut',
+            data: {
+                labels: kdcLabels,
+                datasets: [{
+                    data: kdcValues,
+                    backgroundColor: ['#007AFF', '#34C759', '#FF9500', '#FF3B30', '#5856D6', '#AF52DE', '#FF2D55', '#5AC8FA'],
+                    borderWidth: 0,
+                    hoverOffset: 4
+                }]
+            },
+            options: { responsive: true, cutout: '65%', plugins: { legend: { position: 'bottom' } } }
+        });
+
+        const monthlyCtx = document.getElementById('monthlyChart').getContext('2d');
+        new Chart(monthlyCtx, {
+            type: 'bar',
+            data: {
+                labels: Object.keys(monthlyData), 
+                datasets: [{
+                    label: '읽은 책 (권)',
+                    data: Object.values(monthlyData),
+                    backgroundColor: '#007AFF',
+                    borderRadius: 8,
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+                plugins: { legend: { display: false } }
+            }
+        });
+    });
+</script>
+{% endblock %}

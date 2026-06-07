@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}새로운 책 검색 - Book Archive{% endblock %}
+
+{% block extra_css %}
+<style>
+    .header-area { margin-bottom: 40px; }
+    h1 { font-size: 2.5rem; letter-spacing: -1px; margin: 0 0 10px 0; color: var(--text-main); }
+    .subtitle { color: var(--text-sub); font-size: 1.1rem; }
+    
+    .search-container { background: var(--bg-card); padding: 30px; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-bottom: 40px; border: 1px solid var(--border-color); }
+    
+    .search-form { display: flex; gap: 15px; flex-wrap: wrap; }
+    .search-input { flex-grow: 1; min-width: 200px; padding: 16px 20px; border-radius: 12px; border: 1px solid var(--border-color); background-color: var(--bg-main); color: var(--text-main); font-size: 1.1rem; outline: none; transition: 0.3s; }
+    .search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.15); }
+    
+    .search-select { padding: 16px 20px; border-radius: 12px; border: 1px solid var(--border-color); background-color: var(--bg-main); color: var(--text-main); font-size: 1.05rem; outline: none; cursor: pointer; min-width: 150px; font-family: inherit; }
+    .search-select:focus { border-color: var(--accent); }
+
+    .search-btn { padding: 0 30px; height: 55px; background-color: var(--text-main); color: var(--bg-card); border: none; border-radius: 12px; font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: 0.2s; white-space: nowrap; }
+    .search-btn:hover { opacity: 0.8; }
+    
+    .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 25px; align-items: start; }
+    .book-card { background: var(--bg-card); border-radius: 16px; overflow: hidden; border: 1px solid var(--border-color); transition: 0.3s; display: flex; flex-direction: column; color: inherit; }
+    .book-card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0,0,0,0.08); border-color: var(--accent); }
+    
+    .book-main-link { text-decoration: none; color: inherit; display: flex; flex-direction: column; flex-grow: 1; }
+    .book-cover { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; background-color: var(--bg-main); border-bottom: 1px solid var(--border-color); }
+    .book-info { padding: 20px; display: flex; flex-direction: column; flex-grow: 1; }
+    .book-title { font-size: 1.15rem; font-weight: 700; margin-bottom: 8px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: keep-all; }
+    .book-author { font-size: 0.9rem; color: var(--text-sub); margin-bottom: auto; }
+
+    /* 💡 [디자인 고도화] 시리즈 박스 레이아웃의 완전한 컴팩트 스크롤 아키텍처 */
+    .series-container { background-color: var(--bg-main); border-top: 1px solid var(--border-color); transition: background-color 0.3s; }
+    .series-toggle-btn { width: 100%; text-align: center; padding: 12px; background: none; border: none; font-weight: 700; color: var(--text-sub); cursor: pointer; font-size: 0.9rem; transition: 0.2s; font-family: inherit; outline: none; }
+    .series-toggle-btn:hover { color: var(--accent); background-color: rgba(0, 122, 255, 0.05); }
+    
+    /* 💡 최대 높이를 지정하고 오버플로우 스크롤 바를 부여하여 뷰포트 붕괴 차단 */
+    .series-list { 
+        display: none; flex-direction: column; padding: 0 15px 15px 15px; gap: 8px; 
+        max-height: 240px; overflow-y: auto; box-sizing: border-box;
+    }
+    .series-list.open { display: flex; }
+    
+    /* 💡 스크롤바 디자인 튜닝 */
+    .series-list::-webkit-scrollbar { width: 6px; }
+    .series-list::-webkit-scrollbar-track { background: transparent; }
+    .series-list::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+    .series-list::-webkit-scrollbar-thumb:hover { background: var(--text-sub); }
+    
+    .series-item { text-decoration: none; color: var(--text-main); font-size: 0.88rem; padding: 10px 12px; background: var(--bg-card); border-radius: 10px; border: 1px solid var(--border-color); transition: 0.2s; display: flex; align-items: center; justify-content: space-between; transition: 0.2s, background-color 0.3s; }
+    .series-item:hover { border-color: var(--accent); color: var(--accent); transform: translateX(3px); background-color: rgba(0, 122, 255, 0.02); }
+    .series-item-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 85%; font-weight: 500; }
+    .series-arrow { font-size: 0.75rem; opacity: 0.5; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="header-area">
+    <h1>어떤 책을 찾으시나요?</h1>
+    <div class="subtitle">알라딘 데이터베이스에서 전 세계의 책을 검색해 보세요.</div>
+</div>
+
+<div class="search-container">
+    <form method="POST" action="/" class="search-form">
+        <input type="text" name="search_query" class="search-input" placeholder="책 제목이나 키워드를 입력하세요..." value="{{ search_term }}" required>
+        
+        {% if publisher_list %}
+        <select name="publisher" class="search-select">
+            <option value="전체">전체 출판사</option>
+            {% for pub in publisher_list %}
+                <option value="{{ pub }}" {% if pub == selected_publisher %}selected{% endif %}>{{ pub }}</option>
+            {% endfor %}
+        </select>
+        {% endif %}
+
+        <button type="submit" class="search-btn">검색</button>
+    </form>
+</div>
+
+{% if error %}
+    <div style="text-align: center; color: var(--danger); padding: 40px; background: var(--danger-bg); border-radius: 16px; font-weight: 600;">
+        {{ error }}
+    </div>
+{% endif %}
+
+{% if grouped_books %}
+    <div class="book-grid">
+        {% for key, group in grouped_books.items() %}
+            <div class="book-card">
+                <a href="/book/{{ group[0].isbn }}" class="book-main-link">
+                    <img src="{{ group[0].cover }}" alt="표지" class="book-cover" onerror="this.src='https://via.placeholder.com/200x300?text=No+Cover'">
+                    <div class="book-info">
+                        <div class="book-title">{{ group[0].title }}</div>
+                        <div class="book-author">{{ group[0].author }} | {{ group[0].publisher }}</div>
+                    </div>
+                </a>
+
+                {% if group|length > 1 %}
+                <div class="series-container">
+                    <button type="button" class="series-toggle-btn" onclick="toggleSeries(this)">
+                        시리즈 {{ group|length }}권 모두 보기 ▾
+                    </button>
+                    <div class="series-list">
+                        {% for b in group %}
+                        <a href="/book/{{ b.isbn }}" class="series-item">
+                            <span class="series-item-title">{{ b.title }}</span>
+                            <span class="series-arrow">▶</span>
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function toggleSeries(btn) {
+        const list = btn.nextElementSibling;
+        list.classList.toggle('open');
+        if (list.classList.contains('open')) {
+            btn.innerHTML = btn.innerHTML.replace('▾', '▴');
+        } else {
+            btn.innerHTML = btn.innerHTML.replace('▴', '▾');
+        }
+    }
+</script>
+{% endblock %}

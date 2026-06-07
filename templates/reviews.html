@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+
+{% block title %}내 감상문 보드 - Book Archive{% endblock %}
+
+{% block extra_css %}
+<style>
+    .header-area { margin-bottom: 40px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 20px; }
+    h1 { font-size: 2.5rem; letter-spacing: -1px; margin: 0 0 10px 0; color: var(--text-main); }
+    .subtitle { color: var(--text-sub); font-size: 1.1rem; }
+    
+    .stats-dashboard { display: flex; gap: 20px; margin-bottom: 30px; flex-wrap: wrap; }
+    .stat-card { 
+        flex: 1; min-width: 150px; padding: 30px; border-radius: 24px; text-align: center; 
+        background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-main) 100%);
+        border: 1px solid var(--border-color); box-shadow: 0 8px 30px rgba(0,0,0,0.03); 
+    }
+    .stat-value { font-size: 2.5rem; font-weight: 800; color: var(--accent); margin-bottom: 8px; letter-spacing: -1px; }
+    .stat-label { font-size: 1rem; color: var(--text-sub); font-weight: 600; }
+
+    .control-panel { background: var(--bg-card); padding: 25px; border-radius: 24px; border: 1px solid var(--border-color); margin-bottom: 30px; display: flex; flex-direction: column; gap: 20px; }
+    
+    .board-search-box { width: 100%; box-sizing: border-box; padding: 14px 20px; border-radius: 14px; border: 1px solid var(--border-color); background-color: var(--bg-main); color: var(--text-main); font-size: 1.05rem; outline: none; transition: 0.3s; }
+    .board-search-box:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.1); }
+    
+    .kdc-chip-container { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .kdc-chip-label { font-weight: 700; font-size: 0.95rem; color: var(--text-main); margin-right: 5px; }
+    .kdc-chip { padding: 8px 16px; border-radius: 20px; background-color: var(--bg-main); color: var(--text-sub); border: 1px solid var(--border-color); font-weight: 600; font-size: 0.9rem; cursor: pointer; transition: 0.2s; }
+    .kdc-chip:hover { color: var(--text-main); border-color: var(--text-sub); }
+    .kdc-chip.active { background-color: var(--accent); color: white; border-color: var(--accent); box-shadow: 0 4px 12px rgba(0, 122, 255, 0.25); }
+
+    .filter-bar { display: flex; gap: 10px; background: var(--bg-main); padding: 6px; border-radius: 12px; display: inline-flex; align-self: flex-start; }
+    .filter-btn { padding: 10px 18px; border-radius: 8px; color: var(--text-sub); text-decoration: none; font-weight: 600; font-size: 0.95rem; transition: 0.2s; }
+    .filter-btn:hover { color: var(--text-main); }
+    .filter-btn.active { background-color: var(--bg-card); color: var(--text-main); box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+
+    .review-card { display: flex; background: var(--bg-card); border-radius: 24px; overflow: hidden; border: 1px solid var(--border-color); margin-bottom: 25px; transition: transform 0.3s, opacity 0.3s, border-color 0.3s; flex-direction: row; box-shadow: 0 4px 15px rgba(0,0,0,0.02); }
+    .review-card:hover { border-color: var(--accent); box-shadow: 0 12px 30px rgba(0,0,0,0.06); transform: translateY(-2px); }
+    .cover-wrap { width: 150px; min-width: 150px; border-right: 1px solid var(--border-color); }
+    .cover-wrap img { width: 100%; height: 100%; object-fit: cover; }
+    
+    .card-body { padding: 30px; flex-grow: 1; display: flex; flex-direction: column; }
+    .kdc-badge { align-self: flex-start; background-color: rgba(0, 122, 255, 0.1); color: var(--accent); padding: 6px 14px; border-radius: 10px; font-size: 0.85rem; font-weight: 700; margin-bottom: 12px; }
+    .book-title { font-size: 1.4rem; font-weight: 800; margin-bottom: 6px; color: var(--text-main); letter-spacing: -0.5px; }
+    .my-review { font-size: 1.05rem; color: var(--text-main); line-height: 1.6; background-color: var(--bg-main); padding: 25px; border-radius: 16px; margin-top: 15px; white-space: pre-wrap; }
+    
+    .action-group { margin-top: 25px; display: flex; gap: 10px; align-items: center; justify-content: flex-end; }
+    .edit-btn { background-color: var(--bg-main); color: var(--text-main); text-decoration: none; font-weight: 600; padding: 10px 20px; border-radius: 10px; font-size: 0.95rem; transition: 0.2s; border: 1px solid var(--border-color); }
+    .edit-btn:hover { background-color: var(--border-color); }
+    .delete-btn { background-color: var(--danger-bg); color: var(--danger); font-weight: 600; padding: 10px 20px; border-radius: 10px; font-size: 0.95rem; border: none; cursor: pointer; transition: 0.2s; }
+    .delete-btn:hover { background-color: var(--danger); color: white; }
+
+    #no-search-result { display: none; text-align: center; color: var(--text-sub); padding: 5px; font-weight: 600; }
+
+    .pagination-container { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 40px; margin-bottom: 20px; }
+    .page-num-btn { min-width: 40px; height: 40px; padding: 0 6px; border: 1px solid var(--border-color); background-color: var(--bg-card); color: var(--text-main); border-radius: 10px; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: 0.2s; display: flex; justify-content: center; align-items: center; }
+    .page-num-btn:hover { border-color: var(--text-sub); background-color: var(--bg-main); }
+    .page-num-btn.active { background-color: var(--text-main); color: var(--bg-card); border-color: var(--text-main); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    .page-num-btn:disabled { opacity: 0.4; cursor: not-allowed; background-color: var(--bg-main); }
+
+    @media (max-width: 768px) {
+        .review-card { flex-direction: column; }
+        .cover-wrap { width: 100%; border-right: none; border-bottom: 1px solid var(--border-color); height: 220px; display: flex; justify-content: center; background: var(--bg-main); }
+        .cover-wrap img { width: auto; height: 100%; }
+        .card-body { padding: 25px; }
+        .control-panel { padding: 15px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="header-area">
+    <div>
+        <h1>감상 기록 보드</h1>
+        <div class="subtitle">{{ current_user.nickname }} 작가님의 소중한 독서 기록입니다.</div>
+    </div>
+</div>
+
+<div class="stats-dashboard">
+    <div class="stat-card">
+        <div class="stat-value">{{ total_count }}권</div>
+        <div class="stat-label">총 누적 기록</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ avg_rating }}</div>
+        <div class="stat-label">평균 별점</div>
+    </div>
+</div>
+
+{% if total_count > 0 %}
+<div class="control-panel">
+    <input type="text" id="board-search" class="board-search-box" placeholder="보드 내에서 책 제목, 저자, 감상문 내용을 실시간 검색하세요...">
+    
+    <div class="kdc-chip-container">
+        <span class="kdc-chip-label">분야 필터</span>
+        <button class="kdc-chip active" onclick="filterByKdc('전체', this)">전체</button>
+        {% for kdc, count in kdc_stats.items() %}
+            <button class="kdc-chip" onclick="filterByKdc('{{ kdc }}', this)">{{ kdc.split(' ')[0] }} ({{ count }})</button>
+        {% endfor %}
+    </div>
+
+    <div class="filter-bar">
+        <a href="?sort=latest" class="filter-btn {% if current_sort == 'latest' %}active{% endif %}">최신 작성순</a>
+        <a href="?sort=rating_high" class="filter-btn {% if current_sort == 'rating_high' %}active{% endif %}">별점 높은순</a>
+        <a href="?sort=rating_low" class="filter-btn {% if current_sort == 'rating_low' %}active{% endif %}">별점 낮은순</a>
+    </div>
+</div>
+{% endif %}
+
+<div id="no-search-result">
+    <div style="text-align: center; color: var(--text-sub); padding: 60px; background: var(--bg-card); border-radius: 24px; border: 1px dashed var(--border-color);">
+        필터 조건과 일치하는 감상 기록을 찾을 수 없습니다.
+    </div>
+</div>
+
+<div id="review-list-container">
+    {% for review in reviews %}
+    <div class="review-card" 
+         data-title="{{ review['title'] | lower }}" 
+         data-author="{{ review['author'] | lower }}" 
+         data-text="{{ review['review_text'] | lower }}" 
+         data-kdc="{{ review['kdc_class'] }}">
+        <div class="cover-wrap">
+            <img src="{{ review['cover'] }}" alt="책 표지" onerror="this.src='https://via.placeholder.com/150x220?text=No+Cover'">
+        </div>
+        <div class="card-body">
+            <div class="kdc-badge">{{ review['kdc_class'] }}</div>
+            <div class="book-title">{{ review['title'] }}</div>
+            <div style="color: var(--rating); font-size: 1.3rem; letter-spacing: 2px;">{{ '★' * review['rating'] }}</div>
+            <div class="my-review">{{ review['review_text'] }}</div>
+            
+            <div class="action-group">
+                <a href="/edit_review/{{ review['id'] }}" class="edit-btn">수정</a>
+                <form action="/delete_review" method="POST" onsubmit="return confirm('이 기록을 삭제하시겠습니까?');" style="margin:0;">
+                    <input type="hidden" name="review_id" value="{{ review['id'] }}">
+                    <button type="submit" class="delete-btn">삭제</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div style="text-align: center; color: var(--text-sub); padding: 60px; background: var(--bg-card); border-radius: 24px; border: 1px dashed var(--border-color);">
+        아직 작성된 감상문이 없습니다. 새로운 책을 검색해서 첫 기록을 남겨보세요!
+    </div>
+    {% endfor %}
+</div>
+
+<div id="pagination-bar" class="pagination-container"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let selectedKdc = '전체';
+    const itemsPerPage = 13; 
+    let currentPage = 1;
+    
+    // 💡 디바운스 타이머 변수 선언
+    let debounceTimer = null; 
+
+    function filterByKdc(kdc, element) {
+        selectedKdc = kdc;
+        document.querySelectorAll('.kdc-chip').forEach(chip => chip.classList.remove('active'));
+        element.classList.add('active');
+        currentPage = 1; 
+        applyFilters(); // 클릭은 디바운스 없이 즉시 실행
+    }
+
+    const searchInput = document.getElementById('board-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            // 💡 타자를 칠 때마다 기존 타이머를 취소
+            clearTimeout(debounceTimer);
+            
+            // 💡 0.3초(300ms) 동안 추가 입력이 없으면 비로소 필터링 실행
+            debounceTimer = setTimeout(() => {
+                currentPage = 1; 
+                applyFilters();
+            }, 300);
+        });
+    }
+
+    function applyFilters() {
+        const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+        const cards = document.querySelectorAll('.review-card');
+        const noResultBox = document.getElementById('no-search-result');
+        let filteredCards = [];
+
+        cards.forEach(card => {
+            const title = card.getAttribute('data-title');
+            const author = card.getAttribute('data-author');
+            const text = card.getAttribute('data-text');
+            const kdc = card.getAttribute('data-kdc');
+
+            const matchesSearch = title.includes(query) || author.includes(query) || text.includes(query);
+            const matchesKdc = (selectedKdc === '전체') || (kdc === selectedKdc);
+
+            if (matchesSearch && matchesKdc) {
+                filteredCards.push(card);
+            } else {
+                card.style.display = 'none';
+            }
+        });
+
+        const totalFiltered = filteredCards.length;
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+
+        filteredCards.forEach((card, index) => {
+            if (index >= startIndex && index < endIndex) {
+                card.style.display = 'flex'; 
+            } else {
+                card.style.display = 'none'; 
+            }
+        });
+
+        if (totalFiltered === 0 && cards.length > 0) {
+            noResultBox.style.display = 'block';
+        } else {
+            noResultBox.style.display = 'none';
+        }
+
+        renderPagination(totalFiltered);
+    }
+
+    function renderPagination(totalItems) {
+        const paginationBar = document.getElementById('pagination-bar');
+        if (!paginationBar) return;
+        paginationBar.innerHTML = ''; 
+
+        const totalPages = Math.ceil(totalItems / itemsPerPage);
+        if (totalPages <= 1) return;
+
+        const prevBtn = document.createElement('button');
+        prevBtn.className = 'page-num-btn';
+        prevBtn.innerHTML = '‹';
+        prevBtn.disabled = (currentPage === 1);
+        prevBtn.addEventListener('click', () => {
+            currentPage--;
+            window.scrollTo({ top: 0, behavior: 'smooth' }); 
+            applyFilters();
+        });
+        paginationBar.appendChild(prevBtn);
+
+        for (let i = 1; i <= totalPages; i++) {
+            const pageBtn = document.createElement('button');
+            pageBtn.className = `page-num-btn ${i === currentPage ? 'active' : ''}`;
+            pageBtn.textContent = i;
+            
+            pageBtn.addEventListener('click', () => {
+                currentPage = i;
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                applyFilters();
+            });
+            paginationBar.appendChild(pageBtn);
+        }
+
+        const nextBtn = document.createElement('button');
+        nextBtn.className = 'page-num-btn';
+        nextBtn.innerHTML = '›';
+        nextBtn.disabled = (currentPage === totalPages);
+        nextBtn.addEventListener('click', () => {
+            currentPage++;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            applyFilters();
+        });
+        paginationBar.appendChild(nextBtn);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        applyFilters();
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Book Archive{% endblock %}</title>
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-main: #F5F5F7; --bg-card: #FFFFFF; --bg-sub: #F5F5F7;
+            --text-main: #1D1D1F; --text-sub: #86868B;
+            --border-color: #E5E5EA; --accent: #007AFF; --accent-hover: #0062CC;
+            --danger: #FF3B30; --danger-bg: rgba(255, 59, 48, 0.1); --rating: #FFCC00;
+        }
+        body.dark-mode {
+            --bg-main: #000000; --bg-card: #1C1C1E; --bg-sub: #2C2C2E;
+            --text-main: #FFFFFF; --text-sub: #98989D;
+            --border-color: #38383A; --accent: #0A84FF; --accent-hover: #0062CC;
+            --danger: #FF453A; --danger-bg: rgba(255, 69, 58, 0.15); --rating: #FFD60A;
+        }
+        body { font-family: 'Pretendard', sans-serif; background-color: var(--bg-main); color: var(--text-main); margin: 0; transition: background-color 0.3s, color 0.3s; letter-spacing: -0.3px; }
+
+        .app-container { display: flex; min-height: 100vh; position: relative; }
+
+        .sidebar { 
+            width: 260px; background-color: var(--bg-card); border-right: 1px solid var(--border-color); 
+            padding: 30px 20px; display: flex; flex-direction: column; 
+            position: fixed; height: 100vh; box-sizing: border-box; z-index: 200; 
+            transition: transform 0.3s ease, background-color 0.3s;
+        }
+        .sidebar-logo { font-size: 1.5rem; font-weight: 800; color: var(--text-main); margin-bottom: 40px; text-decoration: none; display: flex; align-items: center; }
+        
+        .nav-menu { display: flex; flex-direction: column; gap: 8px; flex-grow: 1; }
+        .nav-item { padding: 12px 16px; border-radius: 12px; color: var(--text-sub); text-decoration: none; font-weight: 600; transition: 0.2s; display: flex; align-items: center; gap: 12px; font-size: 0.95rem; }
+        .nav-item:hover { background-color: var(--bg-main); color: var(--text-main); }
+        .nav-item.active { background-color: rgba(0, 122, 255, 0.1); color: var(--accent); }
+
+        .sidebar-bottom { margin-top: auto; border-top: 1px solid var(--border-color); padding-top: 20px; display: flex; flex-direction: column; gap: 15px; }
+        .user-profile { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 12px; background-color: var(--bg-main); transition: background-color 0.3s; }
+        .avatar { width: 36px; height: 36px; background-color: var(--accent); color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: 700; font-size: 1.1rem; }
+        .user-info { display: flex; flex-direction: column; flex-grow: 1; overflow: hidden; }
+        .username { font-weight: 700; color: var(--text-main); font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .user-role { font-size: 0.75rem; color: var(--text-sub); font-weight: 600; }
+        
+        .logout-btn { color: var(--danger); font-size: 0.85rem; font-weight: 700; text-decoration: none; padding: 6px 10px; border-radius: 8px; transition: 0.2s; white-space: nowrap; }
+        .logout-btn:hover { background-color: var(--danger-bg); }
+
+        .login-prompt-btn { display: block; text-align: center; padding: 12px; background-color: var(--text-main); color: var(--bg-card); border-radius: 12px; text-decoration: none; font-weight: 600; transition: 0.2s; }
+        .login-prompt-btn:hover { opacity: 0.8; }
+
+        .theme-toggle-btn { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--border-color); background: transparent; color: var(--text-main); font-weight: 600; cursor: pointer; transition: 0.2s; text-align: center; }
+        .theme-toggle-btn:hover { background-color: var(--bg-main); }
+
+        .main-content { margin-left: 260px; flex-grow: 1; width: calc(100% - 260px); padding: 40px; box-sizing: border-box; transition: margin-left 0.3s ease, width 0.3s ease, padding 0.3s; }
+
+        .mobile-header { display: none; }
+        .sidebar-overlay { display: none; }
+
+        #toast-container { position: fixed; top: 25px; right: 25px; z-index: 9999; display: flex; flex-direction: column; gap: 12px; pointer-events: none; }
+        .toast { background-color: var(--bg-card); color: var(--text-main); padding: 16px 24px; border-radius: 14px; min-width: 300px; max-width: 420px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); border-left: 5px solid var(--accent); display: flex; align-items: center; gap: 14px; pointer-events: auto; transform: translateX(120%); opacity: 0; transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s; }
+        .toast.show { transform: translateX(0); opacity: 1; }
+        .toast.success { border-left-color: #34C759; }
+        .toast.error { border-left-color: #FF3B30; }
+        .toast.info { border-left-color: #007AFF; }
+
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); z-index: 300; }
+            .sidebar.open { transform: translateX(0); }
+            .main-content { margin-left: 0; width: 100%; padding: 20px; padding-top: 80px; }
+            .mobile-header { display: flex; align-items: center; justify-content: space-between; padding: 15px 20px; background-color: var(--bg-card); border-bottom: 1px solid var(--border-color); position: fixed; top: 0; left: 0; right: 0; z-index: 100; box-sizing: border-box; transition: background-color 0.3s; }
+            .mobile-logo { font-size: 1.25rem; font-weight: 800; color: var(--text-main); text-decoration: none; display: flex; align-items: center; }
+            .menu-toggle-btn { background: none; border: none; color: var(--text-main); font-size: 1.75rem; cursor: pointer; padding: 0; display: flex; align-items: center; }
+            .sidebar-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.4); z-index: 250; display: block; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+            .sidebar-overlay.show { opacity: 1; pointer-events: auto; }
+            #toast-container { top: 80px; left: 20px; right: 20px; align-items: center; }
+            .toast { width: 100%; box-sizing: border-box; transform: translateY(-30px); }
+            .toast.show { transform: translateY(0); }
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body class="{% if current_user.is_authenticated and current_user.theme == 'dark' %}dark-mode{% endif %}" 
+      data-auth="{{ 'true' if current_user.is_authenticated else 'false' }}">
+    
+    <div id="toast-container"></div>
+
+    <div class="app-container">
+        <header class="mobile-header">
+            <a href="/" class="mobile-logo">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
+                Book Archive
+            </a>
+            <button id="menu-toggle" class="menu-toggle-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            </button>
+        </header>
+
+        <div id="sidebar-overlay" class="sidebar-overlay"></div>
+        
+        <nav id="sidebar" class="sidebar">
+            <a href="/" class="sidebar-logo">
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 10px;"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
+                Book Archive
+            </a>
+
+            <div class="nav-menu">
+                <a href="/" class="nav-item {% if request.path == '/' %}active{% endif %}">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    새로운 책 검색
+                </a>
+                {% if current_user.is_authenticated %}
+                    <a href="/my_reviews" class="nav-item {% if request.path == '/my_reviews' %}active{% endif %}">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                        내 감상문 보드
+                    </a>
+                    <a href="/statistics" class="nav-item {% if request.path == '/statistics' %}active{% endif %}">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                        나의 독서 통계
+                    </a>
+                    <a href="/settings" class="nav-item {% if request.path == '/settings' %}active{% endif %}">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                        계정 설정
+                    </a>
+                {% endif %}
+            </div>
+
+            <div class="sidebar-bottom">
+                {% if current_user.is_authenticated %}
+                    <div class="user-profile">
+                        <div class="avatar">{{ current_user.nickname[0] | upper }}</div>
+                        <div class="user-info">
+                            <span class="username">{{ current_user.nickname }}</span>
+                            <span class="user-role">일반 회원</span>
+                        </div>
+                        <a href="/logout" class="logout-btn">로그아웃</a>
+                    </div>
+                {% else %}
+                    <a href="/login" class="login-prompt-btn">로그인 / 회원가입</a>
+                {% endif %}
+                
+                <button id="theme-toggle" class="theme-toggle-btn">다크 모드 전환</button>
+            </div>
+        </nav>
+
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <script id="flash-data" type="application/json">{{ messages | tojson | safe }}</script>
+      {% endif %}
+    {% endwith %}
+
+    <script>
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            if(!container) return;
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            // SVG 아이콘으로 대체
+            let iconSvg = '';
+            if (type === 'success') {
+                iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`;
+            } else if (type === 'error') {
+                iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+            } else {
+                iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`;
+            }
+
+            toast.innerHTML = `<span style="display: flex; align-items: center;">${iconSvg}</span><div style="font-weight: 600; font-size: 0.95rem; line-height: 1.4;">${message}</div>`;
+            container.appendChild(toast);
+            setTimeout(() => toast.classList.add('show'), 50);
+            setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 400); }, 3500);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const isAuth = document.body.getAttribute('data-auth') === 'true';
+
+            if (!isAuth && localStorage.getItem('theme') === 'dark') {
+                document.body.classList.add('dark-mode');
+            }
+
+            const toggleBtn = document.getElementById('theme-toggle');
+            if(toggleBtn) {
+                toggleBtn.addEventListener('click', () => {
+                    const isDark = document.body.classList.toggle('dark-mode');
+                    const themeValue = isDark ? 'dark' : 'light';
+                    localStorage.setItem('theme', themeValue); 
+
+                    if (isAuth) {
+                        fetch('/api/update_theme', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ theme: themeValue })
+                        }).catch(err => console.error("테마 저장 실패", err));
+                    }
+                });
+            }
+
+            const menuToggle = document.getElementById('menu-toggle');
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            if (menuToggle && sidebar && overlay) {
+                menuToggle.addEventListener('click', () => { sidebar.classList.add('open'); overlay.classList.add('show'); });
+                overlay.addEventListener('click', () => { sidebar.classList.remove('open'); overlay.classList.remove('show'); });
+            }
+
+            const flashElement = document.getElementById('flash-data');
+            if (flashElement) {
+                try {
+                    const flashMessages = JSON.parse(flashElement.textContent);
+                    flashMessages.forEach(msg => { showToast(msg[1], msg[0]); });
+                } catch (e) { console.error("토스트 파싱 오류:", e); }
+            }
+        });
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

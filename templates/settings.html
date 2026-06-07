@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}계정 설정 - Book Archive{% endblock %}
+
+{% block extra_css %}
+<style>
+    .header-area { margin-bottom: 40px; }
+    h1 { font-size: 2.5rem; letter-spacing: -1px; margin: 0 0 10px 0; color: var(--text-main); }
+    .subtitle { color: var(--text-sub); font-size: 1.1rem; }
+    
+    .settings-section { background: var(--bg-card); padding: 35px; border-radius: 24px; border: 1px solid var(--border-color); margin-bottom: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.02); }
+    .section-title { font-size: 1.25rem; font-weight: 700; color: var(--text-main); margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; display: flex; align-items: center; gap: 10px; }
+    
+    .account-info-card { display: flex; flex-direction: column; gap: 15px; background-color: var(--bg-main); padding: 25px; border-radius: 16px; border: 1px solid var(--border-color); }
+    .info-row { display: flex; align-items: center; justify-content: space-between; font-size: 1.05rem; }
+    .info-label { color: var(--text-sub); font-weight: 600; width: 120px; }
+    .info-value { color: var(--text-main); font-weight: 700; flex-grow: 1; }
+    .social-badge { display: inline-block; background-color: #03C75A; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 800; margin-right: 8px; letter-spacing: 1px; }
+    .email-badge { display: inline-block; background-color: var(--text-sub); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 800; margin-right: 8px; letter-spacing: 1px; }
+
+    .input-group { margin-bottom: 20px; max-width: 400px; }
+    .input-group label { display: block; font-weight: 600; margin-bottom: 8px; color: var(--text-main); font-size: 0.95rem; }
+    .input-group input { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid var(--border-color); background-color: var(--bg-main); color: var(--text-main); font-size: 1rem; outline: none; transition: 0.3s; font-family: inherit; box-sizing: border-box; }
+    .input-group input:focus { border-color: var(--accent); }
+    
+    .submit-btn { padding: 14px 24px; background-color: var(--accent); color: white; border: none; border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: 0.2s; font-family: inherit; }
+    .submit-btn:hover { background-color: var(--accent-hover); box-shadow: 0 4px 12px rgba(0, 122, 255, 0.2); }
+
+    /* 💡 위험 구역(Danger Zone) 문구 제거 및 차분한 모던 스타일로 재정의 */
+    .delete-text { color: var(--text-sub); margin-bottom: 20px; line-height: 1.6; font-size: 0.95rem; }
+    .delete-btn { padding: 14px 24px; background-color: transparent; color: var(--danger); border: 1px solid var(--danger); border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: 0.2s; font-family: inherit; }
+    .delete-btn:hover { background-color: var(--danger-bg); }
+
+    @media (max-width: 768px) {
+        .info-row { flex-direction: column; align-items: flex-start; gap: 5px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="header-area">
+    <h1>계정 설정</h1>
+    <div class="subtitle">보안과 프로필 정보를 관리하세요.</div>
+</div>
+
+<div class="settings-section">
+    <div class="section-title">내 계정 정보</div>
+    <div class="account-info-card">
+        <div class="info-row">
+            <div class="info-label">가입 수단</div>
+            <div class="info-value">
+                {% if current_user.username.startswith('naver_') %}
+                    <span class="social-badge">NAVER</span> 네이버 소셜 연동 계정
+                {% else %}
+                    <span class="email-badge">EMAIL</span> 일반 아이디 계정
+                {% endif %}
+            </div>
+        </div>
+        <div class="info-row">
+            <div class="info-label">로그인 ID</div>
+            <div class="info-value" style="font-family: monospace; font-size: 1.1rem;">{{ current_user.username }}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label">현재 닉네임</div>
+            <div class="info-value" style="color: var(--accent);">{{ current_user.nickname }}</div>
+        </div>
+    </div>
+</div>
+
+<div class="settings-section">
+    <div class="section-title">프로필 변경</div>
+    <form method="POST" action="/settings">
+        <input type="hidden" name="action" value="update_nickname">
+        <div class="input-group">
+            <label for="new_nickname">앱에서 사용할 이름 (닉네임)</label>
+            <input type="text" id="new_nickname" name="new_nickname" value="{{ current_user.nickname }}" placeholder="사용하실 닉네임을 입력하세요" required>
+        </div>
+        <button type="submit" class="submit-btn">프로필 업데이트</button>
+    </form>
+</div>
+
+{% if not current_user.username.startswith('naver_') %}
+<div class="settings-section">
+    <div class="section-title">비밀번호 변경</div>
+    <form method="POST" action="/settings">
+        <input type="hidden" name="action" value="change_password">
+        <div class="input-group">
+            <label for="current_password">현재 비밀번호</label>
+            <input type="password" id="current_password" name="current_password" required>
+        </div>
+        <div class="input-group">
+            <label for="new_password">새로운 비밀번호</label>
+            <input type="password" id="new_password" name="new_password" required minlength="4">
+        </div>
+        <button type="submit" class="submit-btn">비밀번호 업데이트</button>
+    </form>
+</div>
+{% endif %}
+
+<!-- 💡 과장된 경고 문구를 걷어내고 상용 앱처럼 깔끔하게 다듬은 계정 탈퇴 섹션 -->
+<div class="settings-section">
+    <div class="section-title">계정 탈퇴</div>
+    <div class="delete-text">
+        계정을 삭제하면 작성하신 모든 독서 기록과 개인 정보가 시스템에서 즉시 파기됩니다.<br>
+        한 번 삭제된 데이터는 복구할 수 없으니 신중하게 결정해 주세요.
+    </div>
+    
+    <form method="POST" action="/settings" onsubmit="return confirm('정말 계정을 삭제하시겠습니까?\n모든 데이터가 영구적으로 지워지며 복구할 수 없습니다.');">
+        <input type="hidden" name="action" value="delete_account">
+        <button type="submit" class="delete-btn">계정 영구 삭제</button>
+    </form>
+</div>
+{% endblock %}

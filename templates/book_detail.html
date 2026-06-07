@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}{{ book.title }} - Book Archive{% endblock %}
+
+{% block extra_css %}
+<style>
+    .book-header { display: flex; gap: 40px; background: var(--bg-card); padding: 40px; border-radius: 24px; border: 1px solid var(--border-color); margin-bottom: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.02); }
+    .book-cover-large { width: 220px; min-width: 220px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); object-fit: cover; aspect-ratio: 2 / 3; }
+    .book-info-large { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
+    
+    /* 💡 KDC 로딩 배지 디자인 */
+    .kdc-visual-badge { background-color: rgba(0, 122, 255, 0.1); color: var(--accent); padding: 8px 16px; border-radius: 10px; font-size: 0.9rem; font-weight: 700; margin-bottom: 15px; transition: 0.3s; }
+    .kdc-visual-badge.loading { opacity: 0.7; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+
+    .book-title-large { font-size: 2.2rem; font-weight: 800; color: var(--text-main); margin-bottom: 10px; line-height: 1.3; letter-spacing: -1px; }
+    .book-author-large { font-size: 1.2rem; color: var(--text-sub); margin-bottom: 20px; font-weight: 500; }
+    .book-desc { font-size: 1.05rem; line-height: 1.7; color: var(--text-main); display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+
+    .review-section { background: var(--bg-main); padding: 35px; border-radius: 24px; margin-bottom: 30px; border: 1px solid var(--border-color); }
+    .section-title { font-size: 1.4rem; font-weight: 700; color: var(--text-main); margin-bottom: 20px; }
+    
+    .review-form { display: flex; flex-direction: column; gap: 20px; }
+    
+    /* 💡 탄력 있는 인터랙티브 별점 애니메이션 */
+    .rating-wrapper { display: flex; align-items: center; gap: 15px; background: var(--bg-card); padding: 10px 20px; border-radius: 16px; display: inline-flex; border: 1px solid var(--border-color); }
+    .rating-wrapper label.rating-title { font-weight: 700; font-size: 1.1rem; color: var(--text-main); margin-right: 10px; }
+    .star-rating { direction: rtl; display: inline-flex; }
+    .star-rating input[type=radio] { display: none; }
+    .star-rating label { color: var(--border-color); font-size: 2.5rem; padding: 0 4px; cursor: pointer; transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+    .star-rating input[type=radio]:checked ~ label,
+    .star-rating label:hover,
+    .star-rating label:hover ~ label { color: var(--rating); transform: scale(1.15); text-shadow: 0 0 15px rgba(255, 204, 0, 0.3); }
+
+    .review-textarea { width: 100%; box-sizing: border-box; height: 160px; padding: 20px; border-radius: 16px; border: 1px solid var(--border-color); background-color: var(--bg-card); color: var(--text-main); font-size: 1.05rem; outline: none; resize: vertical; line-height: 1.6; font-family: inherit; transition: 0.3s; }
+    .review-textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.1); }
+    
+    .submit-btn { padding: 16px; background-color: var(--accent); color: white; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: 700; cursor: pointer; transition: 0.2s; font-family: inherit; }
+    .submit-btn:hover { background-color: var(--accent-hover); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0, 122, 255, 0.3); }
+
+    .history-card { background: var(--bg-card); padding: 25px; border-radius: 16px; border: 1px solid var(--border-color); margin-bottom: 15px; }
+    .history-meta { display: flex; justify-content: space-between; margin-bottom: 15px; color: var(--text-sub); font-size: 0.9rem; }
+    .history-text { font-size: 1.05rem; line-height: 1.6; white-space: pre-wrap; color: var(--text-main); }
+
+    @media (max-width: 768px) {
+        .book-header { flex-direction: column; align-items: center; text-align: center; padding: 25px; }
+        .book-info-large { align-items: center; }
+        .book-desc { -webkit-line-clamp: unset; text-align: left; }
+        .rating-wrapper { flex-direction: column; align-items: flex-start; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="book-header">
+    <img src="{{ book.cover }}" alt="표지" class="book-cover-large" onerror="this.src='https://via.placeholder.com/220x330?text=No+Cover'">
+    <div class="book-info-large">
+        <div id="kdc-visual-badge" class="kdc-visual-badge loading">분야 분석중... ⏳</div>
+        <div class="book-title-large">{{ book.title }}</div>
+        <div class="book-author-large">{{ book.author }} | {{ book.publisher }}</div>
+        <div class="book-desc">{{ book.description | striptags }}</div>
+    </div>
+</div>
+
+{% if current_user.is_authenticated %}
+    <div class="review-section">
+        <div class="section-title">✍️ 새로운 감상 남기기</div>
+        <form action="/save_review" method="POST" class="review-form">
+            <input type="hidden" name="isbn" value="{{ book.isbn13 }}">
+            <input type="hidden" name="title" value="{{ book.title }}">
+            <input type="hidden" name="author" value="{{ book.author }}">
+            <input type="hidden" name="cover" value="{{ book.cover }}">
+            <input type="hidden" name="kdc_class" id="kdc_class_input" value="미분류">
+
+            <div class="rating-wrapper">
+                <label class="rating-title">이 책의 별점은?</label>
+                <div class="star-rating">
+                    <input type="radio" id="star5" name="rating" value="5" checked /><label for="star5" title="5점">★</label>
+                    <input type="radio" id="star4" name="rating" value="4" /><label for="star4" title="4점">★</label>
+                    <input type="radio" id="star3" name="rating" value="3" /><label for="star3" title="3점">★</label>
+                    <input type="radio" id="star2" name="rating" value="2" /><label for="star2" title="2점">★</label>
+                    <input type="radio" id="star1" name="rating" value="1" /><label for="star1" title="1점">★</label>
+                </div>
+            </div>
+
+            <textarea name="review_text" class="review-textarea" placeholder="이 책을 읽고 느낀 점을 자유롭게 적어주세요..." required></textarea>
+            <button type="submit" class="submit-btn">감상문 저장하기</button>
+        </form>
+    </div>
+
+    {% if reviews %}
+    <div class="section-title">🕰️ 나의 이전 기록들</div>
+    {% for review in reviews %}
+        <div class="history-card">
+            <div class="history-meta">
+                <span>{{ review.created_at[:16] }} 작성됨</span>
+                <span style="color: var(--rating); font-size: 1.2rem; font-weight: bold;">{{ '★' * review.rating }}</span>
+            </div>
+            <div class="history-text">{{ review.review_text }}</div>
+        </div>
+    {% endfor %}
+    {% endif %}
+
+{% else %}
+    <div style="text-align: center; padding: 40px; background: var(--bg-card); border-radius: 20px; border: 1px dashed var(--border-color);">
+        <h3 style="margin-top:0; color: var(--text-main);">감상문을 남기려면 로그인이 필요합니다.</h3>
+        <p style="color: var(--text-sub); margin-bottom: 20px;">나만의 독서 기록을 안전하게 저장하세요.</p>
+        <a href="/login" style="padding: 12px 24px; background: var(--text-main); color: var(--bg-main); border-radius: 12px; text-decoration: none; font-weight: bold; display: inline-block;">로그인 / 회원가입</a>
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const isbn = "{{ book.isbn13 }}";
+        const category = "{{ book.categoryName }}";
+        const badge = document.getElementById('kdc-visual-badge');
+        const hiddenInput = document.getElementById('kdc_class_input');
+
+        fetch(`/api/kdc/${isbn}?category=${encodeURIComponent(category)}`)
+            .then(response => response.json())
+            .then(data => {
+                hiddenInput.value = data.kdc_class;
+                badge.textContent = data.kdc_class;
+                badge.classList.remove('loading');
+            })
+            .catch(error => {
+                hiddenInput.value = "미분류";
+                badge.textContent = "미분류";
+                badge.classList.remove('loading');
+            });
+    });
+</script>
+{% endblock %}
