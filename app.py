@@ -20,8 +20,8 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "fallback_secret_key_for_dev")
 
-NAVER_CLIENT_ID = os.environ.get("NAVER_CLIENT_ID")
-NAVER_CLIENT_SECRET = os.environ.get("NAVER_CLIENT_SECRET")
+NAVER_CLIENT_ID = os.environ.get("tX4C62FCAHTajdV2WVmu")
+NAVER_CLIENT_SECRET = os.environ.get("WP_3dx3rrF")
 
 # 💡 환경 변수에서 콜백 주소를 읽어오되, 없을 경우에만 로컬 주소를 기본값으로 사용
 NAVER_REDIRECT_URI = os.environ.get("NAVER_REDIRECT_URI", "http://127.0.0.1:5001/login/naver/callback")
