@@ -298,13 +298,24 @@ def home():
                 "Sort": "SalesPoint", "output": "js", "Version": "20131101"
             }
             try:
-                response = requests.get(url, params=params, timeout=5).json()
+                # [수정된 부분] 응답을 먼저 원본으로 받고 로그 출력 후 JSON 파싱
+                raw_response = requests.get(url, params=params, timeout=5)
+                
+                print(f"=== 알라딘 응답 (페이지 {page}) ===")
+                print(raw_response.text)
+                print("================================")
+                
+                response = raw_response.json()
+                
                 if 'item' in response and len(response['item']) > 0:
                     all_items.extend(response['item'])
                     if len(response['item']) < 50: break
                 else: break
             except Exception as e:
+                # [수정된 부분] JSON 파싱 에러 발생 시 로그에 기록
+                print(f"검색 예외 발생: {e}")
                 break
+                
         if len(all_items) > 0:
             all_publishers = set(item.get('publisher', '').strip() for item in all_items if item.get('publisher', '').strip())
             publisher_list = sorted(list(all_publishers))
