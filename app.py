@@ -20,20 +20,17 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "fallback_secret_key_for_dev")
 
+# 💡 로그인과 도서 검색에 공통으로 사용될 네이버 API 키
 NAVER_CLIENT_ID = os.environ.get("NAVER_CLIENT_ID")
 NAVER_CLIENT_SECRET = os.environ.get("NAVER_CLIENT_SECRET")
 NAVER_REDIRECT_URI = os.environ.get("NAVER_REDIRECT_URI", "http://127.0.0.1:5001/login/naver/callback")
 
-TTB_KEY = os.environ.get("TTB_KEY")
 NLK_API_KEY = os.environ.get("NLK_API_KEY", "38df841a00dd6f304ac12fe83f501b83a396d92b520d512dda2413ee2442405d")
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-# 💡 [수정] 방화벽 완벽 우회를 위해 실제 크롬 브라우저와 동일한 수준의 헤더 세팅
+# 알라딘 우회용이었던 DEFAULT_HEADERS는 이제 삭제해도 무방하지만, 안정성을 위해 남겨둠
 DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept": "application/json, text/javascript, */*; q=0.01",
-    "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
-    "Referer": "https://www.aladin.co.kr/"
 }
 
 login_manager = LoginManager()
@@ -284,36 +281,39 @@ def home():
     selected_publisher = request.form.get('publisher', '전체')
     publisher_list = [] 
     
-    if not TTB_KEY:
-        return render_template('index.html', error="서버 환경 변수에 알라딘 API 키가 설정되지 않았습니다.")
+    if not NAVER_CLIENT_ID or not NAVER_CLIENT_SECRET:
+        return render_template('index.html', error="서버 환경 변수에 네이버 API 키가 설정되지 않았습니다.")
 
     if request.method == 'POST':
         search_term = request.form.get('search_query')
-        # 💡 [수정] http -> https 로 변경 (보안 프로토콜 강화)
-        url = "https://www.aladin.co.kr/ttb/api/ItemSearch.aspx"
+        # 💡 [핵심 수정] 네이버 도서 검색 API로 연동 완료
+        url = "https://openapi.naver.com/v1/search/book.json"
+        
+        naver_headers = {
+            "X-Naver-Client-Id": NAVER_CLIENT_ID,
+            "X-Naver-Client-Secret": NAVER_CLIENT_SECRET
+        }
+        
         all_items = []
-        max_pages = 5 
+        max_pages = 3 
         for page in range(1, max_pages + 1):
+            start_index = (page - 1) * 50 + 1
             params = {
-                "ttbkey": TTB_KEY, "Query": search_term, "QueryType": "Title", 
-                "MaxResults": 50, "start": page, "SearchTarget": "Book", 
-                "Sort": "SalesPoint", "output": "js", "Version": "20131101"
+                "query": search_term, 
+                "display": 50, 
+                "start": start_index, 
+                "sort": "sim" 
             }
             try:
-                raw_response = requests.get(url, params=params, headers=DEFAULT_HEADERS, timeout=5)
-                
-                print(f"=== 알라딘 응답 (페이지 {page}) ===")
-                print(raw_response.text[:200]) 
-                print("================================")
-                
+                raw_response = requests.get(url, params=params, headers=naver_headers, timeout=5)
                 response = raw_response.json()
                 
-                if 'item' in response and len(response['item']) > 0:
-                    all_items.extend(response['item'])
-                    if len(response['item']) < 50: break
+                if 'items' in response and len(response['items']) > 0:
+                    all_items.extend(response['items'])
+                    if len(response['items']) < 50: break
                 else: break
             except Exception as e:
-                print(f"검색 예외 발생: {e}")
+                print(f"네이버 검색 예외 발생: {e}")
                 break
                 
         if len(all_items) > 0:
@@ -322,14 +322,25 @@ def home():
             for item in all_items:
                 book_publisher = item.get('publisher', '').strip()
                 if selected_publisher != '전체' and selected_publisher != book_publisher: continue
-                title = item.get('title')
-                isbn = item.get('isbn13')
-                raw_author = item.get('author', '')
+                
+                # 네이버 API는 검색어에 <b> 태그를 달아주므로 제거
+                title = item.get('title', '').replace('<b>', '').replace('</b>', '')
+                isbn = item.get('isbn', '').split()[-1]
+                raw_author = item.get('author', '').replace('^', ', ')
+                
                 match = re.search(r'\s*[:|-]|\s+\d+', title)
                 base_title = title[:match.start()].strip() if match else f"{title}_{isbn}"
                 main_author = raw_author.split(',')[0].strip()
                 group_key = f"{base_title}_{main_author}"
-                book_data = {'title': title, 'author': raw_author, 'publisher': book_publisher, 'isbn': isbn, 'cover': item.get('cover'), 'description': item.get('description', '줄거리 정보가 없습니다.')}
+                
+                book_data = {
+                    'title': title, 
+                    'author': raw_author, 
+                    'publisher': book_publisher, 
+                    'isbn': isbn, 
+                    'cover': item.get('image', ''), 
+                    'description': item.get('description', '줄거리 정보가 없습니다.')
+                }
                 if group_key not in grouped_books: grouped_books[group_key] = [book_data]
                 else:
                     if not any(b['isbn'] == isbn for b in grouped_books[group_key]):
@@ -342,22 +353,37 @@ def home():
 
 @app.route('/book/<isbn>')
 def book_detail(isbn):
-    if not TTB_KEY:
-        return "알라딘 API 키가 설정되지 않았습니다.", 500
+    if not NAVER_CLIENT_ID or not NAVER_CLIENT_SECRET:
+        return "네이버 API 키가 설정되지 않았습니다.", 500
         
-    # 💡 [수정] http -> https 로 변경
-    url_aladin = "https://www.aladin.co.kr/ttb/api/ItemLookUp.aspx"
-    params_aladin = {"ttbkey": TTB_KEY, "ItemId": isbn, "ItemIdType": "ISBN13", "output": "js", "Version": "20131101"}
+    url_naver = "https://openapi.naver.com/v1/search/book_adv.json"
+    params_naver = {"d_isbn": isbn}
+    naver_headers = {
+        "X-Naver-Client-Id": NAVER_CLIENT_ID,
+        "X-Naver-Client-Secret": NAVER_CLIENT_SECRET
+    }
     
     try:
-        raw_response = requests.get(url_aladin, params=params_aladin, headers=DEFAULT_HEADERS, timeout=5)
-        aladin_response = raw_response.json()
+        raw_response = requests.get(url_naver, params=params_naver, headers=naver_headers, timeout=5)
+        naver_response = raw_response.json()
     except Exception as e:
         print(f"상세조회 예외 발생: {e}")
         return "책 정보를 불러오는 중 오류가 발생했습니다.", 500
 
-    if 'item' not in aladin_response or len(aladin_response['item']) == 0: return "책 정보를 찾을 수 없습니다.", 404
-    book_info = aladin_response['item'][0]
+    if 'items' not in naver_response or len(naver_response['items']) == 0: 
+        return "책 정보를 찾을 수 없습니다.", 404
+        
+    raw_item = naver_response['items'][0]
+    
+    # 💡 [핵심 수정] 알라딘용으로 설계된 기존 HTML 템플릿과 충돌하지 않도록 데이터 포맷 매핑
+    book_info = {
+        'title': raw_item.get('title', '').replace('<b>', '').replace('</b>', ''),
+        'author': raw_item.get('author', '').replace('^', ', '),
+        'publisher': raw_item.get('publisher', ''),
+        'cover': raw_item.get('image', ''),
+        'description': raw_item.get('description', '줄거리 정보가 없습니다.'),
+        'isbn13': raw_item.get('isbn', '').split()[-1]
+    }
     
     existing_reviews = []
     if current_user.is_authenticated:
