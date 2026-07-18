@@ -325,7 +325,8 @@ def home():
                 
                 # 네이버 API는 검색어에 <b> 태그를 달아주므로 제거
                 title = item.get('title', '').replace('<b>', '').replace('</b>', '')
-                isbn = item.get('isbn', '').split()[-1]
+                raw_isbn = item.get('isbn', '').split()
+                isbn = raw_isbn[-1] if raw_isbn else ""
                 raw_author = item.get('author', '').replace('^', ', ')
                 
                 match = re.search(r'\s*[:|-]|\s+\d+', title)
