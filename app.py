@@ -22,15 +22,16 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY", "fallback_secret_key_for_dev
 
 NAVER_CLIENT_ID = os.environ.get("NAVER_CLIENT_ID")
 NAVER_CLIENT_SECRET = os.environ.get("NAVER_CLIENT_SECRET")
-
-# 💡 환경 변수에서 콜백 주소를 읽어오되, 없을 경우에만 로컬 주소를 기본값으로 사용
 NAVER_REDIRECT_URI = os.environ.get("NAVER_REDIRECT_URI", "http://127.0.0.1:5001/login/naver/callback")
 
 TTB_KEY = os.environ.get("TTB_KEY")
 NLK_API_KEY = os.environ.get("NLK_API_KEY", "38df841a00dd6f304ac12fe83f501b83a396d92b520d512dda2413ee2442405d")
-
-# 클라우드 환경변수에서 DB URL 주입
 DATABASE_URL = os.environ.get("DATABASE_URL")
+
+# 💡 [추가] CloudFront 방화벽 통과를 위한 공통 브라우저 위장 헤더
+DEFAULT_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+}
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -68,7 +69,6 @@ def init_db():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # PostgreSQL 표준 문법(SERIAL)을 적용한 스키마 정의
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -99,7 +99,6 @@ def init_db():
         if 'conn' in locals():
             conn.close()
 
-# 애플리케이션 시작 시 DB 초기화 강제 실행
 init_db()
 
 def get_kdc_name(kdc_code):
@@ -134,7 +133,8 @@ def api_kdc(isbn):
         try:
             url_nlk = "https://www.nl.go.kr/NL/search/openApi/search.do"
             params_nlk = {"key": NLK_API_KEY, "detailSearch": "true", "isbnOp": "isbn", "isbnCode": isbn}
-            nlk_response = requests.get(url_nlk, params=params_nlk, timeout=2) 
+            # 💡 [수정] 국립중앙도서관 API 호출 시에도 headers 추가
+            nlk_response = requests.get(url_nlk, params=params_nlk, headers=DEFAULT_HEADERS, timeout=2) 
             root = ET.fromstring(nlk_response.content)
             for item in root.findall('.//item'):
                 kdc = item.findtext('kdc')
@@ -202,7 +202,6 @@ def naver_callback():
 
         if not user_data:
             dummy_pw = generate_password_hash(os.urandom(16).hex())
-            # PostgreSQL에서 삽입된 ID를 가져오기 위해 RETURNING 구문 사용
             cursor.execute(
                 "INSERT INTO users (username, password_hash, nickname, theme) VALUES (%s, %s, %s, 'light') RETURNING id", 
                 (username, dummy_pw, nickname)
@@ -298,11 +297,11 @@ def home():
                 "Sort": "SalesPoint", "output": "js", "Version": "20131101"
             }
             try:
-                # [수정된 부분] 응답을 먼저 원본으로 받고 로그 출력 후 JSON 파싱
-                raw_response = requests.get(url, params=params, timeout=5)
+                # 💡 [수정] 알라딘 API 호출 시 headers=DEFAULT_HEADERS 추가
+                raw_response = requests.get(url, params=params, headers=DEFAULT_HEADERS, timeout=5)
                 
                 print(f"=== 알라딘 응답 (페이지 {page}) ===")
-                print(raw_response.text)
+                print(raw_response.text[:200]) # 디버깅용 로그 유지 (앞부분만)
                 print("================================")
                 
                 response = raw_response.json()
@@ -312,7 +311,6 @@ def home():
                     if len(response['item']) < 50: break
                 else: break
             except Exception as e:
-                # [수정된 부분] JSON 파싱 에러 발생 시 로그에 기록
                 print(f"검색 예외 발생: {e}")
                 break
                 
@@ -347,9 +345,18 @@ def book_detail(isbn):
         
     url_aladin = "http://www.aladin.co.kr/ttb/api/ItemLookUp.aspx"
     params_aladin = {"ttbkey": TTB_KEY, "ItemId": isbn, "ItemIdType": "ISBN13", "output": "js", "Version": "20131101"}
-    aladin_response = requests.get(url_aladin, params=params_aladin).json()
+    
+    try:
+        # 💡 [수정] 도서 상세 정보 호출 시에도 headers=DEFAULT_HEADERS 추가
+        raw_response = requests.get(url_aladin, params=params_aladin, headers=DEFAULT_HEADERS, timeout=5)
+        aladin_response = raw_response.json()
+    except Exception as e:
+        print(f"상세조회 예외 발생: {e}")
+        return "책 정보를 불러오는 중 오류가 발생했습니다.", 500
+
     if 'item' not in aladin_response or len(aladin_response['item']) == 0: return "책 정보를 찾을 수 없습니다.", 404
     book_info = aladin_response['item'][0]
+    
     existing_reviews = []
     if current_user.is_authenticated:
         conn = get_db_connection()
