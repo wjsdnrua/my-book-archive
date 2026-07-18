@@ -28,9 +28,12 @@ TTB_KEY = os.environ.get("TTB_KEY")
 NLK_API_KEY = os.environ.get("NLK_API_KEY", "38df841a00dd6f304ac12fe83f501b83a396d92b520d512dda2413ee2442405d")
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-# 💡 [추가] CloudFront 방화벽 통과를 위한 공통 브라우저 위장 헤더
+# 💡 [수정] 방화벽 완벽 우회를 위해 실제 크롬 브라우저와 동일한 수준의 헤더 세팅
 DEFAULT_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "application/json, text/javascript, */*; q=0.01",
+    "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Referer": "https://www.aladin.co.kr/"
 }
 
 login_manager = LoginManager()
@@ -133,7 +136,6 @@ def api_kdc(isbn):
         try:
             url_nlk = "https://www.nl.go.kr/NL/search/openApi/search.do"
             params_nlk = {"key": NLK_API_KEY, "detailSearch": "true", "isbnOp": "isbn", "isbnCode": isbn}
-            # 💡 [수정] 국립중앙도서관 API 호출 시에도 headers 추가
             nlk_response = requests.get(url_nlk, params=params_nlk, headers=DEFAULT_HEADERS, timeout=2) 
             root = ET.fromstring(nlk_response.content)
             for item in root.findall('.//item'):
@@ -287,7 +289,8 @@ def home():
 
     if request.method == 'POST':
         search_term = request.form.get('search_query')
-        url = "http://www.aladin.co.kr/ttb/api/ItemSearch.aspx"
+        # 💡 [수정] http -> https 로 변경 (보안 프로토콜 강화)
+        url = "https://www.aladin.co.kr/ttb/api/ItemSearch.aspx"
         all_items = []
         max_pages = 5 
         for page in range(1, max_pages + 1):
@@ -297,11 +300,10 @@ def home():
                 "Sort": "SalesPoint", "output": "js", "Version": "20131101"
             }
             try:
-                # 💡 [수정] 알라딘 API 호출 시 headers=DEFAULT_HEADERS 추가
                 raw_response = requests.get(url, params=params, headers=DEFAULT_HEADERS, timeout=5)
                 
                 print(f"=== 알라딘 응답 (페이지 {page}) ===")
-                print(raw_response.text[:200]) # 디버깅용 로그 유지 (앞부분만)
+                print(raw_response.text[:200]) 
                 print("================================")
                 
                 response = raw_response.json()
@@ -343,11 +345,11 @@ def book_detail(isbn):
     if not TTB_KEY:
         return "알라딘 API 키가 설정되지 않았습니다.", 500
         
-    url_aladin = "http://www.aladin.co.kr/ttb/api/ItemLookUp.aspx"
+    # 💡 [수정] http -> https 로 변경
+    url_aladin = "https://www.aladin.co.kr/ttb/api/ItemLookUp.aspx"
     params_aladin = {"ttbkey": TTB_KEY, "ItemId": isbn, "ItemIdType": "ISBN13", "output": "js", "Version": "20131101"}
     
     try:
-        # 💡 [수정] 도서 상세 정보 호출 시에도 headers=DEFAULT_HEADERS 추가
         raw_response = requests.get(url_aladin, params=params_aladin, headers=DEFAULT_HEADERS, timeout=5)
         aladin_response = raw_response.json()
     except Exception as e:
